@@ -1,5 +1,5 @@
 variable "environment_id" {
-  description = "Id do environment 'production' do projeto workshop-os, exportado por workshop-os-infra-database (Epic 2). Sem backend remoto compartilhado ainda (ver RFC-002), copiar de `terraform output environment_id` naquele repo — não é resolvido automaticamente."
+  description = "Id do environment 'production' do projeto 15SOAT-Fase1, exportado por 15SOAT-Fase1-database (Epic 2). Sem backend remoto compartilhado ainda (ver RFC-002), copiar de `terraform output environment_id` naquele repo — não é resolvido automaticamente."
   type        = string
 }
 
@@ -15,7 +15,7 @@ variable "app_replicas" {
 }
 
 variable "app_domain_host" {
-  description = "Hostname público da aplicação (ex.: workshop-os.example.com). Sem default — depende do domínio real do usuário, não decidido nesta sessão."
+  description = "Hostname público da aplicação (ex.: 15SOAT-Fase1.example.com). Sem default — depende do domínio real do usuário, não decidido nesta sessão."
   type        = string
 }
 

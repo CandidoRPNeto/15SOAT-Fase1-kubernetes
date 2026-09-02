@@ -78,7 +78,7 @@ jobs:
       # tentar recriar tudo do zero (Terraform não vai saber que os
       # recursos já existem). Não usar este workflow repetidamente sem
       # antes configurar um backend remoto (ex.: `pg` apontando pro
-      # Postgres do workshop-os-infra-database, já que ele passa a existir
+      # Postgres do 15SOAT-Fase1-database, já que ele passa a existir
       # depois do Epic 2) — deixado como próximo passo explícito, não
       # resolvido silenciosamente aqui.
       - name: terraform init

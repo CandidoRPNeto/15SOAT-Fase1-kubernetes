@@ -21,7 +21,7 @@ resource "dokploy_compose" "datadog_agent" {
             - DD_LOGS_ENABLED=true
             - DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL=true
             - DD_CONTAINER_EXCLUDE=name:datadog-agent
-            - DD_TAGS=env:production service:workshop-os
+            - DD_TAGS=env:production service:15SOAT-Fase1
           volumes:
             - /var/run/docker.sock:/var/run/docker.sock:ro
             - /proc/:/host/proc/:ro
@@ -31,10 +31,10 @@ resource "dokploy_compose" "datadog_agent" {
 }
 
 resource "datadog_monitor" "container_cpu" {
-  name    = "workshop-os — CPU alta / container fora do ar"
+  name    = "15SOAT-Fase1 — CPU alta / container fora do ar"
   type    = "metric alert"
-  message = "CPU do container workshop-os-app acima do esperado (ou parou de reportar — ver notify_no_data). Ver ADR-009."
-  query   = "avg(last_5m):avg:docker.cpu.usage{service:workshop-os-app} > 85"
+  message = "CPU do container 15SOAT-Fase1-app acima do esperado (ou parou de reportar — ver notify_no_data). Ver ADR-009."
+  query   = "avg(last_5m):avg:docker.cpu.usage{service:15SOAT-Fase1-app} > 85"
 
   monitor_thresholds {
     warning  = 70
@@ -48,15 +48,15 @@ resource "datadog_monitor" "container_cpu" {
   no_data_timeframe = 10
 
   include_tags = true
-  tags         = ["service:workshop-os-app", "env:production"]
+  tags         = ["service:15SOAT-Fase1-app", "env:production"]
 }
 
 resource "datadog_monitor" "container_memory" {
-  name    = "workshop-os — memória do container acima do limite do envelope"
+  name    = "15SOAT-Fase1 — memória do container acima do limite do envelope"
   type    = "metric alert"
-  message = "Memória do container workshop-os-app acima de 90% do limite definido em k8s/deployment.yaml (512Mi) — ver ADR-006/adr-009."
+  message = "Memória do container 15SOAT-Fase1-app acima de 90% do limite definido em k8s/deployment.yaml (512Mi) — ver ADR-006/adr-009."
   # 512Mi (mesmo limite de k8s/deployment.yaml — 15SOAT-Fase1) * 0.9
-  query = "avg(last_5m):avg:docker.mem.rss{service:workshop-os-app} > 483183820.8"
+  query = "avg(last_5m):avg:docker.mem.rss{service:15SOAT-Fase1-app} > 483183820.8"
 
   monitor_thresholds {
     critical = 483183820.8
@@ -66,19 +66,19 @@ resource "datadog_monitor" "container_memory" {
   no_data_timeframe = 10
 
   include_tags = true
-  tags         = ["service:workshop-os-app", "env:production"]
+  tags         = ["service:15SOAT-Fase1-app", "env:production"]
 }
 
 resource "datadog_monitor" "service_order_failures" {
-  name    = "workshop-os — falhas no processamento de ordens de serviço"
+  name    = "15SOAT-Fase1 — falhas no processamento de ordens de serviço"
   type    = "log alert"
   message = "5+ erros em 5min nos logs da app (canal JSON, Epic 4) — ver evolucao_fase3 'alertas para falhas no processamento de ordens de serviço'."
-  query   = "logs(\"service:workshop-os-app status:error\").index(\"main\").rollup(\"count\").last(\"5m\") > 5"
+  query   = "logs(\"service:15SOAT-Fase1-app status:error\").index(\"main\").rollup(\"count\").last(\"5m\") > 5"
 
   monitor_thresholds {
     critical = 5
   }
 
   include_tags = true
-  tags         = ["service:workshop-os-app", "env:production"]
+  tags         = ["service:15SOAT-Fase1-app", "env:production"]
 }
