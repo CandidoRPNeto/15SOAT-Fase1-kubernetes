@@ -1,0 +1,79 @@
+name: Deploy
+
+# Disparado via workflow_dispatch pelo CI/CD de 15SOAT-Fase1 (repo da app,
+# ver .github/workflows/ci-cd.yml lá — stage deploy-dokploy), depois de
+# publicar uma nova imagem no GHCR. Não roda em push/PR — a ordem é sempre
+# "app buildou e publicou" -> "esta infra faz o apply com a nova imagem".
+on:
+  workflow_dispatch:
+    inputs:
+      image:
+        description: "Imagem Docker recém publicada (ghcr.io/.../15soat-fase1:<sha>)"
+        required: true
+        type: string
+      environment:
+        description: "production ou homolog"
+        required: true
+        type: string
+        default: production
+
+permissions:
+  contents: read
+
+jobs:
+  # Só o secret decide se o apply roda — sem ele, o job termina sem erro
+  # (mesmo padrão do deploy-k8s/deploy-db em 15SOAT-Fase1 com KUBE_CONFIG).
+  check-secrets:
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
+    steps:
+      - name: Check required secrets
+        id: check
+        run: |
+          if [ -n "${{ secrets.DOKPLOY_ENDPOINT }}" ] && \
+             [ -n "${{ secrets.DOKPLOY_API_KEY }}" ] && \
+             [ -n "${{ secrets.TF_VAR_ENVIRONMENT_ID }}" ] && \
+             [ -n "${{ secrets.TF_VAR_APP_DOMAIN_HOST }}" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  apply:
+    needs: check-secrets
+    runs-on: ubuntu-latest
+    # Lacuna conhecida (ver main.tf/variables.tf): só há recursos Terraform
+    # pro ambiente production. Um dispatch com environment=homolog ainda
+    # cai aqui e aplica contra o mesmo (único) dokploy_application — não é
+    # o comportamento certo pra dois ambientes reais, é o que existe até o
+    # módulo ganhar recursos por ambiente (ver ep-app-infra-iac.md).
+    if: needs.check-secrets.outputs.ready == 'true'
+    env:
+      DOKPLOY_ENDPOINT: ${{ secrets.DOKPLOY_ENDPOINT }}
+      DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+      TF_VAR_environment_id: ${{ secrets.TF_VAR_ENVIRONMENT_ID }}
+      TF_VAR_app_domain_host: ${{ secrets.TF_VAR_APP_DOMAIN_HOST }}
+      TF_VAR_app_image: ${{ inputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.15.8"
+
+      # ATENÇÃO: sem backend remoto configurado (versions.tf não declara um
+      # `backend` block — ver lacuna em RFC-002), o state deste apply é
+      # local ao runner efêmero do GitHub Actions e se perde a cada run.
+      # Isso funciona pra um primeiro apply isolado, mas o PRÓXIMO run vai
+      # tentar recriar tudo do zero (Terraform não vai saber que os
+      # recursos já existem). Não usar este workflow repetidamente sem
+      # antes configurar um backend remoto (ex.: `pg` apontando pro
+      # Postgres do workshop-os-infra-database, já que ele passa a existir
+      # depois do Epic 2) — deixado como próximo passo explícito, não
+      # resolvido silenciosamente aqui.
+      - name: terraform init
+        run: terraform init
+
+      - name: terraform apply
+        run: terraform apply -auto-approve
