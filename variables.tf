@@ -45,3 +45,20 @@ variable "memory_reservation" {
   type        = string
   default     = "256m"
 }
+
+# Epic 6 — observabilidade (ver ADR-009). datadog_api_key precisa ir pro
+# compose do Agent via env var (não é o mesmo mecanismo do provider
+# datadog, que lê DD_API_KEY/DD_APP_KEY do ambiente sozinho) — daí existir
+# como variável Terraform aqui, mesmo o provider não precisar dela
+# diretamente.
+variable "datadog_api_key" {
+  description = "API key do Datadog — injetada no Agent via compose. Sensível, sem default."
+  type        = string
+  sensitive   = true
+}
+
+variable "datadog_site" {
+  description = "Site Datadog (datadoghq.com, datadoghq.eu, etc.)."
+  type        = string
+  default     = "datadoghq.com"
+}
