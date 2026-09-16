@@ -1,5 +1,5 @@
 variable "environment_id" {
-  description = "Id do environment 'production' do projeto workshop-os, exportado por workshop-os-infra-database (Epic 2). Sem backend remoto compartilhado ainda (ver RFC-002), copiar de `terraform output environment_id` naquele repo — não é resolvido automaticamente."
+  description = "Id do environment 'production' do projeto 15SOAT-Fase1, exportado por 15SOAT-Fase1-database (Epic 2). Sem backend remoto compartilhado ainda (ver RFC-002), copiar de `terraform output environment_id` naquele repo — não é resolvido automaticamente."
   type        = string
 }
 
@@ -15,7 +15,7 @@ variable "app_replicas" {
 }
 
 variable "app_domain_host" {
-  description = "Hostname público da aplicação (ex.: workshop-os.example.com). Sem default — depende do domínio real do usuário, não decidido nesta sessão."
+  description = "Hostname público da aplicação (ex.: 15SOAT-Fase1.example.com). Sem default — depende do domínio real do usuário, não decidido nesta sessão."
   type        = string
 }
 
@@ -44,4 +44,21 @@ variable "memory_reservation" {
   description = "Memória reservada, formato Docker (ver k8s/deployment.yaml: requests.memory 256Mi)."
   type        = string
   default     = "256m"
+}
+
+# Epic 6 — observabilidade (ver ADR-009). datadog_api_key precisa ir pro
+# compose do Agent via env var (não é o mesmo mecanismo do provider
+# datadog, que lê DD_API_KEY/DD_APP_KEY do ambiente sozinho) — daí existir
+# como variável Terraform aqui, mesmo o provider não precisar dela
+# diretamente.
+variable "datadog_api_key" {
+  description = "API key do Datadog — injetada no Agent via compose. Sensível, sem default."
+  type        = string
+  sensitive   = true
+}
+
+variable "datadog_site" {
+  description = "Site Datadog (datadoghq.com, datadoghq.eu, etc.)."
+  type        = string
+  default     = "datadoghq.com"
 }

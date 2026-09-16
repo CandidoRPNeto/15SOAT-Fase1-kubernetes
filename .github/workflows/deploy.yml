@@ -34,7 +34,9 @@ jobs:
           if [ -n "${{ secrets.DOKPLOY_ENDPOINT }}" ] && \
              [ -n "${{ secrets.DOKPLOY_API_KEY }}" ] && \
              [ -n "${{ secrets.TF_VAR_ENVIRONMENT_ID }}" ] && \
-             [ -n "${{ secrets.TF_VAR_APP_DOMAIN_HOST }}" ]; then
+             [ -n "${{ secrets.TF_VAR_APP_DOMAIN_HOST }}" ] && \
+             [ -n "${{ secrets.DD_API_KEY }}" ] && \
+             [ -n "${{ secrets.DD_APP_KEY }}" ]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
@@ -55,6 +57,13 @@ jobs:
       TF_VAR_environment_id: ${{ secrets.TF_VAR_ENVIRONMENT_ID }}
       TF_VAR_app_domain_host: ${{ secrets.TF_VAR_APP_DOMAIN_HOST }}
       TF_VAR_app_image: ${{ inputs.image }}
+      # Epic 6: DD_API_KEY/DD_APP_KEY autenticam o provider datadog (cria
+      # os monitors); TF_VAR_datadog_api_key é o mesmo valor de API key,
+      # injetado no Agent via compose — dois mecanismos, mesmo segredo
+      # (ver comentário em variables.tf).
+      DD_API_KEY: ${{ secrets.DD_API_KEY }}
+      DD_APP_KEY: ${{ secrets.DD_APP_KEY }}
+      TF_VAR_datadog_api_key: ${{ secrets.DD_API_KEY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -69,7 +78,7 @@ jobs:
       # tentar recriar tudo do zero (Terraform não vai saber que os
       # recursos já existem). Não usar este workflow repetidamente sem
       # antes configurar um backend remoto (ex.: `pg` apontando pro
-      # Postgres do workshop-os-infra-database, já que ele passa a existir
+      # Postgres do 15SOAT-Fase1-database, já que ele passa a existir
       # depois do Epic 2) — deixado como próximo passo explícito, não
       # resolvido silenciosamente aqui.
       - name: terraform init
