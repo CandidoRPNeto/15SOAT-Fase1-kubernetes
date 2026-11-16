@@ -1,0 +1,21 @@
+# Fase 4: um namespace por microsserviço (cada um com seu banco) + plataforma.
+# Traefik continua no namespace `traefik` (k8s/platform/traefik.yaml).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: platform
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: os
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: billing
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: execution

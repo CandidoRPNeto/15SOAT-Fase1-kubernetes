@@ -1,5 +1,37 @@
 # 15SOAT-Fase1-kubernetes
 
+## Fase 4 — plataforma compartilhada dos microsserviços
+
+Infra comum aos 3 microsserviços da Fase 4, no cluster kind local
+`workshop-os` (deploy automatizado via runner self-hosted —
+[ADR-014](https://github.com/CandidoRPNeto/15SOAT-Fase1/blob/master/docs/architecture/adrs/adr-014-self-hosted-runner-kind.md)).
+Cada serviço mantém **seus próprios** manifests, banco e pipeline:
+[OS Service](https://github.com/CandidoRPNeto/15SOAT-Fase1) ·
+[Billing](https://github.com/CandidoRPNeto/15SOAT-Fase1-billing) ·
+[Execution](https://github.com/CandidoRPNeto/15SOAT-Fase1-execution).
+
+| Caminho | Conteúdo |
+|---|---|
+| `k8s/platform/namespaces.yaml` | `platform`, `os`, `billing`, `execution` |
+| `k8s/platform/traefik.yaml` | Gateway (NodePort 30080) + middlewares `forward-auth`, `strip-billing`, `strip-execution` (file provider, [ADR-013](https://github.com/CandidoRPNeto/15SOAT-Fase1/blob/master/docs/architecture/adrs/adr-013-gateway-forward-auth.md)) |
+| `k8s/platform/rabbitmq.yaml` | RabbitMQ 3.13 + management ([ADR-011](https://github.com/CandidoRPNeto/15SOAT-Fase1/blob/master/docs/architecture/adrs/adr-011-rabbitmq-async-messaging.md)) |
+| `scripts/apply-platform.sh` | Carrega imagens no kind, cria Secrets, aplica a plataforma |
+| `scripts/bootstrap-secrets.sh` | Secrets por serviço em `~/.workshop-os/secrets/*.env` (fora do git) |
+| `scripts/setup-runner.sh` | Registra o runner self-hosted (label `kind`) de um repo |
+| `demo/e2e-saga.sh` | Fluxo completo de uma OS pelos 3 serviços (via gateway) |
+| `demo/e2e-compensation.sh` | Falhas: `stock`, `queue-full`, `worker-down` |
+
+```bash
+export KUBECONFIG=~/.kube/workshop-os-config
+# opcional: export MERCADOPAGO_ACCESS_TOKEN=TEST-...   (senão Billing usa PAYMENT_GATEWAY=offline)
+scripts/apply-platform.sh
+# depois, em cada repo de serviço: scripts/deploy-kind.sh <imagem:tag>  (ou push na main → CI)
+PAUSE=1 demo/e2e-saga.sh
+kubectl -n platform port-forward svc/rabbitmq 15672   # UI do RabbitMQ (usuário/senha em ~/.workshop-os/secrets/rabbitmq.env)
+```
+
+## Fase 3 — Terraform Dokploy (histórico)
+
 Terraform que provisiona o recurso de aplicação e o domínio/roteamento
 (Traefik) do Workshop OS na Fase 3, no mesmo servidor
 [Dokploy](https://dokploy.com) usado pelo banco (repo irmão
