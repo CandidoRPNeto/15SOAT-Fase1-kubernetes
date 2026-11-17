@@ -27,3 +27,17 @@ jobs:
 
       - name: terraform validate
         run: terraform validate
+
+      - name: terraform validate (observability, Fase 4)
+        working-directory: observability
+        run: terraform init -backend=false && terraform validate
+
+  # Fase 4 — manifests da plataforma e scripts de deploy/demo.
+  platform-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: kustomize build
+        run: kubectl kustomize k8s/platform > /dev/null
+      - name: shellcheck
+        run: shellcheck -x -e SC2034,SC1091 scripts/*.sh demo/*.sh
