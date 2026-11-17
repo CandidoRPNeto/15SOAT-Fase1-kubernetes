@@ -15,9 +15,12 @@ if [[ ! -x ./config.sh ]]; then
   tar xzf runner.tgz && rm runner.tgz
 fi
 
-token="$(gh api -X POST "repos/$repo/actions/runners/registration-token" --jq .token)"
-./config.sh --unattended --replace --url "https://github.com/$repo" --token "$token" \
-  --name "$(hostname)-$name" --labels kind --work _work
+# Re-running only refreshes the systemd unit; config.sh refuses a configured dir.
+if [[ ! -f .runner ]]; then
+  token="$(gh api -X POST "repos/$repo/actions/runners/registration-token" --jq .token)"
+  ./config.sh --unattended --replace --url "https://github.com/$repo" --token "$token" \
+    --name "$(hostname)-$name" --labels kind --work _work
+fi
 
 unit="$HOME/.config/systemd/user/actions-runner-$name.service"
 mkdir -p "$(dirname "$unit")"
@@ -29,6 +32,9 @@ After=network-online.target docker.service
 [Service]
 WorkingDirectory=$dir
 Environment=KUBECONFIG=$HOME/.kube/workshop-os-config
+# systemd --user starts with a minimal PATH; kind/kubectl (e.g. linuxbrew)
+# would be missing and deploy-kind.sh fails with "kind: command not found".
+Environment=PATH=$PATH
 ExecStart=$dir/run.sh
 Restart=always
 
@@ -36,5 +42,6 @@ Restart=always
 WantedBy=default.target
 UNIT
 systemctl --user daemon-reload
-systemctl --user enable --now "actions-runner-$name.service"
+systemctl --user enable "actions-runner-$name.service"
+systemctl --user restart "actions-runner-$name.service"
 echo "runner for $repo is $(systemctl --user is-active "actions-runner-$name.service")"
