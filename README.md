@@ -15,11 +15,13 @@ Cada serviço mantém **seus próprios** manifests, banco e pipeline:
 | `k8s/platform/namespaces.yaml` | `platform`, `os`, `billing`, `execution` |
 | `k8s/platform/traefik.yaml` | Gateway (NodePort 30080) + middlewares `forward-auth`, `strip-billing`, `strip-execution` (file provider, [ADR-013](https://github.com/CandidoRPNeto/15SOAT-Fase1/blob/master/docs/architecture/adrs/adr-013-gateway-forward-auth.md)) |
 | `k8s/platform/rabbitmq.yaml` | RabbitMQ 3.13 + management ([ADR-011](https://github.com/CandidoRPNeto/15SOAT-Fase1/blob/master/docs/architecture/adrs/adr-011-rabbitmq-async-messaging.md)) |
+| `k8s/platform/tracing.yaml` | APM local: `trace-agent` (OpenTelemetry Collector, recebe o protocolo do dd-trace na 8126) → Jaeger ([ADR-016](https://github.com/CandidoRPNeto/15SOAT-Fase1/blob/master/docs/architecture/adrs/adr-016-local-apm-jaeger.md)) |
 | `scripts/apply-platform.sh` | Carrega imagens no kind, cria Secrets, aplica a plataforma |
 | `scripts/bootstrap-secrets.sh` | Secrets por serviço em `~/.workshop-os/secrets/*.env` (fora do git) |
 | `scripts/setup-runner.sh` | Registra o runner self-hosted (label `kind`) de um repo |
 | `demo/e2e-saga.sh` | Fluxo completo de uma OS pelos 3 serviços (via gateway) |
 | `demo/e2e-compensation.sh` | Falhas: `stock`, `queue-full`, `worker-down` |
+| `demo/trace-saga.sh <id da OS>` | Linha do tempo da saga a partir dos logs JSON dos 3 serviços (filtra por `saga_id`) |
 
 ```bash
 export KUBECONFIG=~/.kube/workshop-os-config
@@ -28,6 +30,8 @@ scripts/apply-platform.sh
 # depois, em cada repo de serviço: scripts/deploy-kind.sh <imagem:tag>  (ou push na main → CI)
 PAUSE=1 demo/e2e-saga.sh
 kubectl -n platform port-forward svc/rabbitmq 15672   # UI do RabbitMQ (usuário/senha em ~/.workshop-os/secrets/rabbitmq.env)
+kubectl -n platform port-forward svc/jaeger 16686     # Jaeger: http://localhost:16686 (traces somem se o pod reiniciar)
+bash demo/trace-saga.sh <id da OS>                    # rode com bash: lib.sh quebra o PATH se for dado `source` no zsh
 ```
 
 ## Fase 3 — Terraform Dokploy (histórico)

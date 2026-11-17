@@ -1,0 +1,151 @@
+# Local APM (ADR-016): the services keep dd-trace in their images and send
+# spans in the Datadog protocol to `trace-agent:8126` — an OpenTelemetry
+# Collector with the `datadog` receiver — which forwards them over OTLP to
+# Jaeger. Replaces the host Datadog Agent (free plan has no APM).
+# UI: kubectl -n platform port-forward svc/jaeger 16686 → http://localhost:16686
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trace-agent-config
+  namespace: platform
+data:
+  config.yaml: |
+    receivers:
+      datadog:
+        endpoint: 0.0.0.0:8126
+        read_timeout: 60s
+        # dd-trace sends 64-bit ids plus the high half in `_dd.p.tid`; with the
+        # Enable128BitTraceID gate (args below) the receiver rebuilds the full
+        # W3C id, so PHP spans join the trace Traefik started.
+        trace_id_cache_size: 10000
+    processors:
+      # The worker loops poll the outbox every second; each poll is a root
+      # span (eloquent.get, laravel.event.handle) that would bury the saga.
+      # Keep only trace chunks that carry real work: an HTTP request, an
+      # outbox publish or a handled message (ADR-016). OR between lines.
+      tail_sampling:
+        decision_wait: 3s
+        policies:
+          - name: requests-and-messages
+            type: ottl_condition
+            ottl_condition:
+              error_mode: ignore
+              span:
+                # kubelet probes hit /up every few seconds: not part of any flow.
+                - 'name == "laravel.request" and attributes["http.route"] != "up"'
+                - 'name == "outbox.relay"'
+                # Consumer chunks carry message.handle (ADR-016). Not
+                # amqp.basic.deliver: dd-trace also emits a detached deliver
+                # span per message (linked, not parented) that would be noise.
+                - 'name == "message.handle"'
+      # Laravel emits one span per framework event (thousands per saga, all
+      # leaves): dropped so the trace view shows HTTP, SQL/Mongo and AMQP.
+      filter/laravel-events:
+        error_mode: ignore
+        traces:
+          span:
+            - 'name == "laravel.event.handle"'
+      batch:
+        timeout: 2s
+    exporters:
+      otlp:
+        endpoint: jaeger:4317
+        tls:
+          insecure: true
+    service:
+      pipelines:
+        traces:
+          receivers: [datadog]
+          processors: [tail_sampling, filter/laravel-events, batch]
+          exporters: [otlp]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: trace-agent
+  namespace: platform
+spec:
+  selector:
+    app: trace-agent
+  ports:
+    - name: datadog
+      port: 8126
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trace-agent
+  namespace: platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: trace-agent
+  template:
+    metadata:
+      labels:
+        app: trace-agent
+    spec:
+      containers:
+        - name: otelcol
+          image: otel/opentelemetry-collector-contrib:0.130.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - --config=/etc/otelcol/config.yaml
+            - --feature-gates=receiver.datadogreceiver.Enable128BitTraceID
+          ports:
+            - containerPort: 8126
+          volumeMounts:
+            - { name: config, mountPath: /etc/otelcol }
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { memory: 256Mi }
+      volumes:
+        - name: config
+          configMap:
+            name: trace-agent-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger
+  namespace: platform
+spec:
+  selector:
+    app: jaeger
+  ports:
+    - name: ui
+      port: 16686
+    - name: otlp-grpc
+      port: 4317
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger
+  namespace: platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jaeger
+  template:
+    metadata:
+      labels:
+        app: jaeger
+    spec:
+      containers:
+        - name: jaeger
+          image: jaegertracing/all-in-one:1.62.0
+          imagePullPolicy: IfNotPresent
+          env:
+            # In-memory store: traces vanish on restart; enough for the demo.
+            - { name: SPAN_STORAGE_TYPE, value: memory }
+            - { name: MEMORY_MAX_TRACES, value: "20000" }
+            - { name: COLLECTOR_OTLP_ENABLED, value: "true" }
+          ports:
+            - containerPort: 16686
+            - containerPort: 4317
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 512Mi }

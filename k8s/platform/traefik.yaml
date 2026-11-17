@@ -108,6 +108,13 @@ spec:
             # a requisição passou pelo gateway antes de chegar à aplicação.
             - --accesslog=true
             - --log.level=INFO
+            # APM local (tracing.yaml): o gateway abre o trace e injeta o
+            # `traceparent` no ForwardAuth e no serviço de destino, então o
+            # Jaeger mostra gateway → /auth/verify → serviço num trace só.
+            - --tracing=true
+            - --tracing.serviceName=traefik
+            - --tracing.otlp.grpc.endpoint=jaeger.platform.svc.cluster.local:4317
+            - --tracing.otlp.grpc.insecure=true
           ports:
             - name: web
               containerPort: 80
