@@ -119,6 +119,10 @@ spec:
       port: 16686
     - name: otlp-grpc
       port: 4317
+    # OTLP/HTTP: demo/fluxo-os.sh sends each step's root span here, so the
+    # step's requests hang under one named span instead of a missing parent.
+    - name: otlp-http
+      port: 4318
 ---
 apiVersion: apps/v1
 kind: Deployment

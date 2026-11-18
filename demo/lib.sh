@@ -9,10 +9,11 @@ step() { printf '\n\033[1;36m▶ %s\033[0m\n' "$*"; [[ "${PAUSE:-0}" == 1 ]] && 
 ok() { printf '  \033[32m✔ %s\033[0m\n' "$*"; }
 fail() { printf '  \033[31m✘ %s\033[0m\n' "$*" >&2; exit 1; }
 
-api() { # method path token [json-body]
+api() { # method path token [json-body]; TRACEPARENT (opcional) junta a chamada a um trace
   local method=$1 path=$2 token=$3 body=${4:-}
   curl -sS -X "$method" "$GATEWAY$path" -H 'Accept: application/json' -H 'Content-Type: application/json' \
-    ${token:+-H "Authorization: Bearer $token"} ${body:+-d "$body"}
+    ${token:+-H "Authorization: Bearer $token"} ${body:+-d "$body"} \
+    ${TRACEPARENT:+-H "traceparent: $TRACEPARENT"}
 }
 
 login() { api POST /api/v1/auth/login "" "{\"email\":\"$1\",\"password\":\"password\"}" | jq -r .token; }

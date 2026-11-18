@@ -21,6 +21,7 @@ Cada serviço mantém **seus próprios** manifests, banco e pipeline:
 | `scripts/setup-runner.sh` | Registra o runner self-hosted (label `kind`) de um repo |
 | `demo/e2e-saga.sh` | Fluxo completo de uma OS pelos 3 serviços (via gateway) |
 | `demo/e2e-compensation.sh` | Falhas: `stock`, `queue-full`, `worker-down` |
+| `demo/fluxo-os.sh abrir\|diagnosticar\|aprovar\|entregar\|compensar` | Fluxo da OS em 4 comandos (um por etapa da saga) + cenário de compensação; cada comando vira um trace no Jaeger (`terminal-demo`) e imprime o link |
 | `demo/trace-saga.sh <id da OS>` | Linha do tempo da saga a partir dos logs JSON dos 3 serviços (filtra por `saga_id`) |
 
 ```bash
