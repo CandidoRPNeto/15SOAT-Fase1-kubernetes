@@ -4,6 +4,9 @@
 #   ~/.workshop-os/secrets/{rabbitmq,os,billing,execution}.env
 # Mercado Pago: put MERCADOPAGO_ACCESS_TOKEN=TEST-... in billing.env (or export
 # it before the first run). Without it Billing uses PAYMENT_GATEWAY=offline.
+# Datadog: export DD_API_KEY (and optionally DD_SITE) before the first run, or
+# write datadog.env by hand; without it the Datadog Agent DaemonSet stays
+# pending (CreateContainerConfigError) and nothing else is affected.
 # Usage: KUBECONFIG=~/.kube/workshop-os-config scripts/bootstrap-secrets.sh
 set -euo pipefail
 dir="${WORKSHOP_SECRETS_DIR:-$HOME/.workshop-os/secrets}"
@@ -36,6 +39,11 @@ RABBITMQ_PASSWORD=$RABBITMQ_PASSWORD
 PAYMENT_GATEWAY=$gateway
 MERCADOPAGO_ACCESS_TOKEN=$token"
 
+if [[ -n "${DD_API_KEY:-}" ]]; then
+  write_once "$dir/datadog.env" "DD_API_KEY=$DD_API_KEY
+DD_SITE=${DD_SITE:-datadoghq.com}"
+fi
+
 write_once "$dir/execution.env" "APP_KEY=$(app_key)
 RABBITMQ_USER=$RABBITMQ_USER
 RABBITMQ_PASSWORD=$RABBITMQ_PASSWORD"
@@ -48,3 +56,6 @@ apply_secret platform rabbitmq-credentials "$dir/rabbitmq.env"
 apply_secret os os-secret "$dir/os.env"
 apply_secret billing billing-secret "$dir/billing.env"
 apply_secret execution execution-secret "$dir/execution.env"
+if [[ -f "$dir/datadog.env" ]]; then
+  apply_secret platform datadog-credentials "$dir/datadog.env"
+fi

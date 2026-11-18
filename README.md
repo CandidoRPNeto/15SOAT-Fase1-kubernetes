@@ -16,6 +16,7 @@ Cada serviço mantém **seus próprios** manifests, banco e pipeline:
 | `k8s/platform/traefik.yaml` | Gateway (NodePort 30080) + middlewares `forward-auth`, `strip-billing`, `strip-execution` (file provider, [ADR-013](https://github.com/CandidoRPNeto/15SOAT-Fase1/blob/master/docs/architecture/adrs/adr-013-gateway-forward-auth.md)) |
 | `k8s/platform/rabbitmq.yaml` | RabbitMQ 3.13 + management ([ADR-011](https://github.com/CandidoRPNeto/15SOAT-Fase1/blob/master/docs/architecture/adrs/adr-011-rabbitmq-async-messaging.md)) |
 | `k8s/platform/tracing.yaml` | APM local: `trace-agent` (OpenTelemetry Collector, recebe o protocolo do dd-trace na 8126) → Jaeger ([ADR-016](https://github.com/CandidoRPNeto/15SOAT-Fase1/blob/master/docs/architecture/adrs/adr-016-local-apm-jaeger.md)) |
+| `k8s/platform/datadog-agent.yaml` | Datadog Agent (DaemonSet): métricas de host, kubelet e containers no Datadog (plano free; APM vai para o Jaeger). API key no Secret `datadog-credentials`, criado de `~/.workshop-os/secrets/datadog.env` |
 | `scripts/apply-platform.sh` | Carrega imagens no kind, cria Secrets, aplica a plataforma |
 | `scripts/bootstrap-secrets.sh` | Secrets por serviço em `~/.workshop-os/secrets/*.env` (fora do git) |
 | `scripts/setup-runner.sh` | Registra o runner self-hosted (label `kind`) de um repo |
@@ -23,6 +24,8 @@ Cada serviço mantém **seus próprios** manifests, banco e pipeline:
 | `demo/e2e-compensation.sh` | Falhas: `stock`, `queue-full`, `worker-down` |
 | `demo/fluxo-os.sh abrir\|diagnosticar\|aprovar\|entregar\|compensar` | Fluxo da OS em 4 comandos (um por etapa da saga) + cenário de compensação; cada comando vira um trace no Jaeger (`terminal-demo`) e imprime o link |
 | `demo/trace-saga.sh <id da OS>` | Linha do tempo da saga a partir dos logs JSON dos 3 serviços (filtra por `saga_id`) |
+
+Deploy automático: o job `deploy` do CI (`.github/workflows/ci.yml`) roda `scripts/apply-platform.sh` no runner self-hosted (`kind`) a cada push na `main` e faz um smoke test no gateway. O mesmo script serve para subir tudo à mão:
 
 ```bash
 export KUBECONFIG=~/.kube/workshop-os-config

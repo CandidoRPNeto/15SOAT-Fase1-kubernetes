@@ -5,7 +5,8 @@
 set -euo pipefail
 cluster="${KIND_CLUSTER:-workshop-os}"
 images=(traefik:v3.1 rabbitmq:3.13-management postgres:16-alpine mongo:7
-  otel/opentelemetry-collector-contrib:0.164.0 jaegertracing/all-in-one:1.62.0 "$@")
+  otel/opentelemetry-collector-contrib:0.164.0 jaegertracing/all-in-one:1.62.0
+  datadog/agent:7.59.1 "$@")
 for image in "${images[@]}"; do
   docker image inspect "$image" >/dev/null 2>&1 || docker pull -q "$image"
   kind load docker-image "$image" --name "$cluster" >/dev/null

@@ -37,3 +37,23 @@ jobs:
         run: kubectl kustomize k8s/platform > /dev/null
       - name: shellcheck
         run: shellcheck -x -e SC2034,SC1091 scripts/*.sh demo/*.sh
+
+  # Deploy automático da plataforma (Traefik, RabbitMQ, Collector/Jaeger,
+  # Datadog Agent) no cluster kind, pelo runner self-hosted desta máquina
+  # (ADR-014) — o mesmo caminho dos serviços. Só em push na main protegida.
+  deploy:
+    needs: [terraform-validate, platform-validate]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, kind]
+    concurrency:
+      group: deploy-kind-platform
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply platform (images, secrets, manifests, rollouts)
+        run: scripts/apply-platform.sh
+      - name: Smoke test (gateway responds; ForwardAuth rejects anonymous calls)
+        run: |
+          code="$(curl -s -o /dev/null -w '%{http_code}' -H 'Accept: application/json' http://localhost:30080/api/v1/auth/me)"
+          echo "GET /api/v1/auth/me -> $code"
+          test "$code" = 401
