@@ -1,0 +1,99 @@
+# Datadog Agent como DaemonSet (ADR-009 / ADR-016): métricas de host, Kubernetes
+# (kubelet) e containers (containerd) de todos os pods, enviadas ao Datadog.
+# Só o que o plano free cobre: APM, logs e processos ficam desligados — o
+# rastreamento distribuído vai para o Jaeger (tracing.yaml).
+# A API key vem do Secret `datadog-credentials` (scripts/bootstrap-secrets.sh,
+# a partir de ~/.workshop-os/secrets/datadog.env) — nunca commitada.
+# O control-plane do kind tem taint NoSchedule: o agente roda no nó worker,
+# onde ficam todos os workloads (1 host no plano free).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: datadog-agent
+  namespace: platform
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: datadog-agent
+rules:
+  - apiGroups: [""]
+    resources: [nodes, nodes/metrics, nodes/stats, nodes/proxy, nodes/spec, pods, services, endpoints, namespaces, events]
+    verbs: [get, list, watch]
+  - nonResourceURLs: [/metrics, /version, /healthz]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: datadog-agent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: datadog-agent
+subjects:
+  - kind: ServiceAccount
+    name: datadog-agent
+    namespace: platform
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: datadog-agent
+  namespace: platform
+spec:
+  selector:
+    matchLabels:
+      app: datadog-agent
+  template:
+    metadata:
+      labels:
+        app: datadog-agent
+    spec:
+      serviceAccountName: datadog-agent
+      containers:
+        - name: agent
+          image: datadog/agent:7.59.1
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: DD_API_KEY
+              valueFrom:
+                secretKeyRef: { name: datadog-credentials, key: DD_API_KEY }
+            - name: DD_SITE
+              valueFrom:
+                secretKeyRef: { name: datadog-credentials, key: DD_SITE }
+            - { name: DD_CLUSTER_NAME, value: workshop-os }
+            - name: DD_HOSTNAME
+              valueFrom: { fieldRef: { fieldPath: spec.nodeName } }
+            - name: DD_KUBERNETES_KUBELET_HOST
+              valueFrom: { fieldRef: { fieldPath: status.hostIP } }
+            # kind usa certificado autoassinado no kubelet.
+            - { name: DD_KUBELET_TLS_VERIFY, value: "false" }
+            - { name: DD_CRI_SOCKET_PATH, value: /host/run/containerd/containerd.sock }
+            - { name: DD_TAGS, value: "env:dev project:workshop-os" }
+            # Abre o endpoint /live usado pela livenessProbe (desligado por padrão).
+            - { name: DD_HEALTH_PORT, value: "5555" }
+            # Recursos pagos desligados (APM → Jaeger; logs → stdout JSON).
+            - { name: DD_APM_ENABLED, value: "false" }
+            - { name: DD_LOGS_ENABLED, value: "false" }
+            - { name: DD_PROCESS_AGENT_ENABLED, value: "false" }
+            - { name: DD_ORCHESTRATOR_EXPLORER_ENABLED, value: "false" }
+            - { name: DD_COLLECT_KUBERNETES_EVENTS, value: "false" }
+          resources:
+            requests: { cpu: 50m, memory: 192Mi }
+            limits: { memory: 384Mi }
+          livenessProbe:
+            httpGet: { path: /live, port: 5555 }
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          volumeMounts:
+            - { name: containerd, mountPath: /host/run/containerd, readOnly: true }
+            - { name: procdir, mountPath: /host/proc, readOnly: true }
+            - { name: cgroups, mountPath: /host/sys/fs/cgroup, readOnly: true }
+      volumes:
+        - name: containerd
+          hostPath: { path: /run/containerd }
+        - name: procdir
+          hostPath: { path: /proc }
+        - name: cgroups
+          hostPath: { path: /sys/fs/cgroup }

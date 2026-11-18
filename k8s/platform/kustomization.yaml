@@ -5,3 +5,4 @@ resources:
   - traefik.yaml
   - rabbitmq.yaml
   - tracing.yaml
+  - datadog-agent.yaml
