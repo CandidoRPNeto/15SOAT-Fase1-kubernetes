@@ -28,10 +28,6 @@ jobs:
       - name: terraform validate
         run: terraform validate
 
-      - name: terraform validate (observability, Fase 4)
-        working-directory: observability
-        run: terraform init -backend=false && terraform validate
-
   # Fase 4 — manifests da plataforma e scripts de deploy/demo.
   platform-validate:
     runs-on: ubuntu-latest

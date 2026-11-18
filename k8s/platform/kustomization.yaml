@@ -4,3 +4,4 @@ resources:
   - namespaces.yaml
   - traefik.yaml
   - rabbitmq.yaml
+  - tracing.yaml

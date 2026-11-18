@@ -12,3 +12,4 @@ kubectl apply -k "$here/../k8s/platform"
 kubectl -n traefik rollout restart deployment/traefik
 kubectl -n traefik rollout status deployment/traefik --timeout=120s
 kubectl -n platform rollout status statefulset/rabbitmq --timeout=300s
+kubectl -n platform rollout status deployment/jaeger deployment/trace-agent --timeout=120s
