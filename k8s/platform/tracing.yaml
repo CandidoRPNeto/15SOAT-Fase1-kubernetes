@@ -14,9 +14,11 @@ data:
       datadog:
         endpoint: 0.0.0.0:8126
         read_timeout: 60s
-        # dd-trace sends 64-bit ids plus the high half in `_dd.p.tid`; with the
-        # Enable128BitTraceID gate (args below) the receiver rebuilds the full
-        # W3C id, so PHP spans join the trace Traefik started.
+        # dd-trace sends 64-bit ids plus the high half in `_dd.p.tid`; the
+        # Enable128BitTraceID gate (beta, on by default since 0.16x) rebuilds
+        # the full W3C id, so PHP spans join the trace Traefik started. On
+        # 0.130 (alpha) its cache was not thread-safe and the collector died
+        # with "concurrent map read and map write" under load.
         trace_id_cache_size: 10000
     processors:
       # The worker loops poll the outbox every second; each poll is a root
@@ -88,18 +90,17 @@ spec:
     spec:
       containers:
         - name: otelcol
-          image: otel/opentelemetry-collector-contrib:0.130.0
+          image: otel/opentelemetry-collector-contrib:0.164.0
           imagePullPolicy: IfNotPresent
           args:
             - --config=/etc/otelcol/config.yaml
-            - --feature-gates=receiver.datadogreceiver.Enable128BitTraceID
           ports:
             - containerPort: 8126
           volumeMounts:
             - { name: config, mountPath: /etc/otelcol }
           resources:
             requests: { cpu: 50m, memory: 64Mi }
-            limits: { memory: 256Mi }
+            limits: { memory: 512Mi }
       volumes:
         - name: config
           configMap:
@@ -139,13 +140,29 @@ spec:
           image: jaegertracing/all-in-one:1.62.0
           imagePullPolicy: IfNotPresent
           env:
-            # In-memory store: traces vanish on restart; enough for the demo.
-            - { name: SPAN_STORAGE_TYPE, value: memory }
-            - { name: MEMORY_MAX_TRACES, value: "20000" }
+            # Badger (disk) instead of the memory store: saga traces carry 100+
+            # spans and the memory store was OOM-killed at 20000, 8000 and 2000
+            # traces under continuous load. Badger keeps memory low, expires
+            # traces by TTL and, on an emptyDir, survives container restarts.
+            - { name: SPAN_STORAGE_TYPE, value: badger }
+            - { name: BADGER_EPHEMERAL, value: "false" }
+            - { name: BADGER_DIRECTORY_KEY, value: /badger/key }
+            - { name: BADGER_DIRECTORY_VALUE, value: /badger/data }
+            - { name: BADGER_SPAN_STORE_TTL, value: 1h }
+            # Ingesting continuous load (route-load-test.js irregular, 2 loops) sits at 700–900Mi with peaks
+            # past 1Gi; GOMEMLIMIT keeps the GC ahead of the container limit.
+            - { name: GOMEMLIMIT, value: "1200MiB" }
+            # Jaeger would trace its own UI queries ("jaeger-all-in-one" service).
+            - { name: OTEL_TRACES_SAMPLER, value: always_off }
             - { name: COLLECTOR_OTLP_ENABLED, value: "true" }
           ports:
             - containerPort: 16686
             - containerPort: 4317
           resources:
-            requests: { cpu: 50m, memory: 128Mi }
-            limits: { memory: 512Mi }
+            requests: { cpu: 50m, memory: 256Mi }
+            limits: { memory: 1536Mi }
+          volumeMounts:
+            - { name: badger, mountPath: /badger }
+      volumes:
+        - name: badger
+          emptyDir: { sizeLimit: 4Gi }
